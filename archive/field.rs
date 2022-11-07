@@ -3,9 +3,7 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-mod int;
 mod poly;
-pub use int::*;
 pub use poly::*;
 
 pub struct AdditiveIter<F: Field> {
@@ -73,4 +71,20 @@ pub trait Field:
     fn multiplicative_iter(self) -> MultiplicativeIter<Self> {
         MultiplicativeIter { item: self }
     }
+
+    fn additive_inv(&self) -> Self {
+        self.clone().neg()
+    }
+
+    fn multiplicative_inv(&self) -> Option<Self> {
+        if self.clone() == Self::zero_el() {
+            None
+        } else {
+            Some(Field::div(&Self::one_el(), self))
+        }
+    }
+}
+
+pub trait FiniteField: Field {
+    fn order_el() -> Self;
 }

@@ -1,15 +1,67 @@
-mod iter;
-use super::Field;
+mod iter {
+    use super::*;
+    use num::Num;
+
+    #[derive(Debug, Clone)]
+    pub struct PolyCoefIter<T: Num + Copy + std::fmt::Display> {
+        pub pow: isize,
+        pub coef: T,
+        pub current_idx: usize,
+        pub poly: Polynomial<T>,
+    }
+
+    impl<T> Iterator for PolyCoefIter<T>
+    where
+        T: Num + Copy + std::fmt::Display,
+    {
+        type Item = Self;
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.current_idx == 0 {
+                None
+            } else {
+                self.current_idx -= 1;
+                self.pow -= 1;
+                if let Some(c) = self.poly.get_at(self.current_idx).copied() {
+                    self.coef = c;
+                    Some(self).cloned()
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    impl<T> IntoIterator for Polynomial<T>
+    where
+        T: Num + Copy + std::fmt::Display,
+    {
+        type IntoIter = PolyCoefIter<T>;
+        type Item = <PolyCoefIter<T> as Iterator>::Item;
+        fn into_iter(self) -> Self::IntoIter {
+            PolyCoefIter {
+                pow: self.degree(),
+                coef: self.coefs.last().unwrap_or(&T::zero()).clone(),
+                current_idx: if self.len() == 0 { 0 } else { self.len() - 1 },
+                poly: self.clone(),
+            }
+        }
+    }
+}
+
 pub use iter::*;
+use num::{Num, One, Zero};
 use std::{
     fmt::{Debug, Display},
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, RangeBounds, Sub, SubAssign},
+    ops::{
+        Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, RangeBounds, Rem, RemAssign, Sub,
+        SubAssign,
+    },
 };
 
 #[derive(Debug, Clone)]
 pub struct Polynomial<T>
 where
-    T: Field + Copy,
+    T: Num + Copy + std::fmt::Display,
 {
     pub coefs: Vec<T>,
     pub zero_pow_idx: usize,
@@ -17,7 +69,7 @@ where
 
 impl<T> Polynomial<T>
 where
-    T: Field + Copy,
+    T: Num + Copy + std::fmt::Display,
 {
     pub fn new() -> Self {
         Polynomial {
@@ -58,12 +110,7 @@ where
     }
 
     pub fn init_pow(&self) -> isize {
-        if let Some((i, _)) = self
-            .coefs
-            .iter()
-            .enumerate()
-            .find(|(_, &c)| c != T::zero_el())
-        {
+        if let Some((i, _)) = self.coefs.iter().enumerate().find(|(_, &c)| !c.is_zero()) {
             (i as isize) - (self.zero_pow_idx as isize)
         } else {
             0
@@ -91,9 +138,40 @@ where
     }
 
     pub fn normalize(&mut self) -> &mut Self {
+        // let min = if self.zero_pow_idx < self.len() {
+        //     self.zero_pow_idx
+        // } else if self.len() == 0 {
+        //     0
+        // } else {
+        //     self.len() - 1
+        // };
+
+        // // Normalize ax^i + bx^(-i) to a/bx^0.
+        // let mut x = T::zero();
+        // for i in 0..min {
+        //     let c1 = self.coefs[i];
+        //     if c1.is_zero() {
+        //         if let Some(c2) = self.get_at_mut(self.zero_pow_idx + i + 1) {
+        //             x = x + *c2 / c1;
+        //             *c2 = T::zero();
+        //         }
+        //     }
+        //     *self.get_at_mut(i).unwrap() = T::zero();
+        // }
+        // match self.get_at_mut(self.zero_pow_idx) {
+        //     Some(c) => *c = *c + x,
+        //     None => {
+        //         for _ in self.len()..self.zero_pow_idx + 1 {
+        //             self.coefs.push(T::zero());
+        //         }
+        //         *self.coefs.get_mut(self.zero_pow_idx).unwrap() = x;
+        //     }
+        // }
+
+        // Remove 0s at head
         while self.len() >= 1 {
             if let Some(&coef) = self.coefs.last() {
-                if coef == T::zero_el() {
+                if coef.is_zero() {
                     self.coefs.pop();
                 } else {
                     break;
@@ -102,15 +180,18 @@ where
                 break;
             }
         }
+
+        // Remove 0s at tail
         while self.zero_pow_idx > 0 {
             if let Some(&coef) = self.coefs.first() {
-                if coef == T::zero_el() {
+                if coef.is_zero() {
                     self.coefs.remove(0);
                     self.zero_pow_idx -= 1;
                 } else {
                     break;
                 }
             } else {
+                self.zero_pow_idx = 0;
                 break;
             }
         }
@@ -216,7 +297,7 @@ where
     }
 
     pub fn shl(&mut self, amount: usize) -> &mut Self {
-        self.shl_with(amount, T::zero_el())
+        self.shl_with(amount, T::zero())
     }
 
     pub fn extend_right(&mut self, amount: usize) -> &mut Self {
@@ -227,7 +308,7 @@ where
 
     pub fn extend_left(&mut self, amount: usize) -> &mut Self {
         self.coefs
-            .splice(self.len()..self.len(), vec![T::zero_el(); amount]);
+            .splice(self.len()..self.len(), vec![T::zero(); amount]);
         self
     }
 
@@ -236,8 +317,8 @@ where
             return self.simple_div_mut(coef, -power);
         }
         self.shl(power as usize);
-        if coef != T::one_el() {
-            self.coefs.iter_mut().for_each(|x| *x *= coef);
+        if coef != T::one() {
+            self.coefs.iter_mut().for_each(|x| *x = *x * coef);
         }
         self
     }
@@ -252,12 +333,12 @@ where
         if power < 0 {
             return self.simple_mul_mut(coef, -power);
         }
-        if coef == T::zero_el() {
+        if coef.is_zero() {
             panic!("Divide by zero error")
         }
         self.shr_lossles(power as usize);
-        if coef != T::one_el() {
-            self.coefs.iter_mut().for_each(|x| *x /= coef);
+        if coef != T::one() {
+            self.coefs.iter_mut().for_each(|x| *x = *x / coef);
         }
         self
     }
@@ -281,7 +362,7 @@ where
 
 impl<T> PartialEq for Polynomial<T>
 where
-    T: Field + Copy + std::fmt::Debug,
+    T: Num + Copy + std::fmt::Display,
 {
     fn eq(&self, other: &Self) -> bool {
         if self.degree() != other.degree() {
@@ -300,7 +381,7 @@ where
 
 impl<T> Display for Polynomial<T>
 where
-    T: Field + Copy + Debug,
+    T: Num + Copy + std::fmt::Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut c = self.clone();
@@ -310,7 +391,7 @@ where
         let init_pow = c.init_stored_pow();
         let len = c.len();
         if len == 0 {
-            return write!(f, "{}", T::zero_el());
+            return write!(f, "{}", T::zero());
         }
 
         let s = c
@@ -328,10 +409,10 @@ where
                 // Since this code will probably only be used by me in regard to fields of the characteristic 2 where negative numbers are the same as positive numbers, this shouldn't be an issue anyways
 
                 let current_pow = init_pow + ((len - idx) as isize) - 1;
-                let show_plus = *coef != T::zero_el() && idx != 0;
-                let show_x = current_pow != 0 && *coef != T::zero_el();
+                let show_plus = !coef.is_zero() && idx != 0;
+                let show_x = current_pow != 0 && !coef.is_zero();
                 let show_pow = show_x && current_pow != 1;
-                let show_coef = *coef != T::zero_el() && (*coef != T::one_el() || !show_x);
+                let show_coef = !coef.is_zero() && (*coef != T::one() || !show_x);
 
                 let mut s = format!("{acc}");
                 if show_plus {
@@ -358,13 +439,13 @@ where
 
 impl<T> AddAssign for Polynomial<T>
 where
-    T: Field + Copy,
+    T: Num + Copy + std::fmt::Display,
 {
     fn add_assign(&mut self, rhs: Self) {
         self.align_size_to(&rhs);
         self.coefs.iter_mut().enumerate().for_each(|(i, c1)| {
             if let Some(&c2) = rhs.get((i as isize) - (self.zero_pow_idx as isize)) {
-                *c1 += c2;
+                *c1 = *c1 + c2;
             }
         });
         self.normalize();
@@ -373,7 +454,7 @@ where
 
 impl<T> Add for Polynomial<T>
 where
-    T: Field + Copy,
+    T: Num + Copy + std::fmt::Display,
 {
     type Output = Self;
 
@@ -386,13 +467,13 @@ where
 
 impl<T> SubAssign for Polynomial<T>
 where
-    T: Field + Copy,
+    T: Num + Copy + std::fmt::Display,
 {
     fn sub_assign(&mut self, rhs: Self) {
         self.align_size_to(&rhs);
         self.coefs.iter_mut().enumerate().for_each(|(i, c1)| {
             if let Some(&c2) = rhs.get((i as isize) - (self.zero_pow_idx as isize)) {
-                *c1 -= c2;
+                *c1 = *c1 - c2;
             }
         });
         self.normalize();
@@ -401,7 +482,7 @@ where
 
 impl<T> Sub for Polynomial<T>
 where
-    T: Field + Copy,
+    T: Num + Copy + std::fmt::Display,
 {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
@@ -413,20 +494,20 @@ where
 
 impl<T> Neg for Polynomial<T>
 where
-    T: Field + Copy,
+    T: Num + Copy + Neg<Output = T> + std::fmt::Display,
 {
     type Output = Self;
     fn neg(self) -> Self::Output {
         let mut c = self.clone();
         c.normalize();
-        c.coefs.iter_mut().for_each(|c| *c = -*c);
+        c.coefs.iter_mut().for_each(|c| *c = c.neg());
         c
     }
 }
 
 impl<T> MulAssign for Polynomial<T>
 where
-    T: Field + Copy,
+    T: Num + Copy + std::fmt::Display,
 {
     fn mul_assign(&mut self, rhs: Self) {
         if rhs.len() == 0 {
@@ -448,7 +529,7 @@ where
 
 impl<T> Mul for Polynomial<T>
 where
-    T: Field + Copy,
+    T: Num + Copy + std::fmt::Display,
 {
     type Output = Self;
 
@@ -459,19 +540,73 @@ where
     }
 }
 
-impl<T> Field for Polynomial<T>
+impl<T> Zero for Polynomial<T>
 where
-    T: Field + Copy + std::fmt::Debug,
+    T: Num + Copy + std::fmt::Display,
 {
-    fn zero_el() -> Self {
-        Self::from_vec(vec![T::zero_el()], 0)
+    fn zero() -> Self {
+        Self::from_vec(vec![T::zero()], 0)
     }
 
-    fn one_el() -> Self {
-        Self::from_vec(vec![T::one_el()], 0)
+    fn is_zero(&self) -> bool {
+        for c in self.coefs.clone() {
+            if !c.is_zero() {
+                return true;
+            }
+        }
+        false
     }
+}
 
-    fn div_mod(&self, rhs: &Self) -> (Self, Self) {
+impl<T> One for Polynomial<T>
+where
+    T: Num + Copy + std::fmt::Display,
+{
+    fn one() -> Self {
+        Self::from_vec(vec![T::one()], 0)
+    }
+}
+
+impl<T> RemAssign for Polynomial<T>
+where
+    T: Num + Copy + std::fmt::Display,
+{
+    fn rem_assign(&mut self, rhs: Self) {
+        *self = self.div_mod(&rhs).1;
+    }
+}
+
+impl<T> Rem for Polynomial<T>
+where
+    T: Num + Copy + std::fmt::Display,
+{
+    type Output = Self;
+    fn rem(self, rhs: Self) -> Self::Output {
+        let mut c = self.clone();
+        c %= rhs;
+        c
+    }
+}
+
+pub enum ParsePolyErr {
+    ParseErr,
+}
+
+impl<T> Num for Polynomial<T>
+where
+    T: Num + Copy + std::fmt::Display,
+{
+    type FromStrRadixErr = ParsePolyErr;
+    fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
+        Err(ParsePolyErr::ParseErr)
+    }
+}
+
+impl<T> Polynomial<T>
+where
+    T: Num + Copy + std::fmt::Display,
+{
+    pub fn div_mod(&self, rhs: &Self) -> (Self, Self) {
         // Algorithm taken and adapted from here: https://stackoverflow.com/a/26178457/13764271
 
         let mut num = self.clone();
@@ -479,12 +614,8 @@ where
         num.normalize();
         den.normalize();
 
-        if den == Self::zero_el() {
-            panic!("Divide by 0(-Polynom) Error");
-        }
-
         if num.degree() < den.degree() {
-            return (Self::zero_el(), num);
+            return (Self::zero(), num);
         }
         let iterations = (num.degree() - den.degree()) as usize + 1;
 
@@ -499,7 +630,7 @@ where
             quot.insert_coef(0, mult);
 
             let deg_diff = num.degree() - den.degree();
-            if mult != T::zero_el() {
+            if !mult.is_zero() {
                 let d = den.simple_mul(mult, deg_diff);
                 println!("d: {}", d);
                 num -= d;
@@ -509,11 +640,27 @@ where
 
         (quot, num)
     }
+
+    // fn multiplicative_inv(&self) -> Option<Self> {
+    //     if self.is_zero() {
+    //         None
+    //     } else {
+    //         let mut rev_coefs = self.coefs.clone();
+    //         rev_coefs.reverse();
+    //         rev_coefs
+    //             .iter_mut()
+    //             .for_each(|c| *c = c.multiplicative_inv().unwrap_or(T::zero()));
+    //         Some(Polynomial {
+    //             coefs: rev_coefs,
+    //             zero_pow_idx: self.len() - 1 + self.zero_pow_idx,
+    //         })
+    //     }
+    // }
 }
 
 impl<T> DivAssign for Polynomial<T>
 where
-    T: Field + Copy + Debug,
+    T: Num + Copy + std::fmt::Display,
 {
     fn div_assign(&mut self, rhs: Self) {
         let (q, _) = self.div_mod(&rhs);
@@ -523,7 +670,7 @@ where
 
 impl<T> Div for Polynomial<T>
 where
-    T: Field + Copy + Debug,
+    T: Num + Copy + std::fmt::Display,
 {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
