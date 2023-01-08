@@ -1,7 +1,11 @@
-package java.polydiv.structures;
+package polydiv.src.structures;
 
 public abstract class Field<T extends Field<T, A, M>, A extends AlbelianGroup<T>, M extends AlbelianGroup<T>>
 		extends DivisionRing<T, A, M> {
+
+	protected Field(A additive, M multiplicative) {
+		super(additive, multiplicative);
+	}
 
 	/*
 	 * The following is true for all albelian groups.

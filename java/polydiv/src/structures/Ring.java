@@ -1,7 +1,12 @@
-package java.polydiv.structures;
+package polydiv.src.structures;
 
 public abstract class Ring<T extends Ring<T, A, M>, A extends AlbelianGroup<T>, M extends Monoid<T>>
 		extends Rng<T, A, M> {
+
+	protected Ring(A additive, M multiplicative) {
+		super(additive, multiplicative);
+	}
+
 	/**
 	 * Get the one element. Must be the same as the additive identity, i.e.
 	 * `M.getIdentity() == getOne()` for all elements.

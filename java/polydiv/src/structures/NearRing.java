@@ -1,7 +1,12 @@
-package java.polydiv.structures;
+package polydiv.src.structures;
 
 public abstract class NearRing<T extends NearRing<T, A, M>, A extends Group<T>, M extends SemiGroup<T>>
 		extends DoubleMagma<T, A, M> {
+
+	protected NearRing(A additive, M multiplicative) {
+		super(additive, multiplicative);
+	}
+
 	/**
 	 * Get the zero element. Must be the same as the multiplicative identity, i.e.
 	 * `M.getIdentity() == getZero()` for all elements.

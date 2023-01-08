@@ -1,6 +1,6 @@
-package java.polydiv;
+package polydiv.src;
 
-import java.polydiv.structures.*;
+import polydiv.src.structures.*;
 
 class AdditiveRational
 		implements AlbelianGroup<Rational> {
@@ -45,15 +45,20 @@ class MultiplicativeRational
 }
 
 public class Rational extends Field<Rational, AdditiveRational, MultiplicativeRational> {
+	private static final AdditiveRational additive = new AdditiveRational();
+	private static final MultiplicativeRational multiplicative = new MultiplicativeRational();
+
 	protected int numer;
 	protected int denom;
 
 	public Rational(int n) {
+		super(additive, multiplicative);
 		numer = n;
 		denom = 1;
 	}
 
 	public Rational(int numer, int denom) {
+		super(additive, multiplicative);
 		this.numer = numer;
 		this.denom = denom;
 	}
@@ -77,5 +82,10 @@ public class Rational extends Field<Rational, AdditiveRational, MultiplicativeRa
 
 	public void setDenominator(int denom) {
 		this.denom = denom;
+	}
+
+	@Override
+	public String toString() {
+		return getNumerator() + " / " + getDenominator();
 	}
 }

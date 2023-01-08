@@ -1,6 +1,6 @@
-package java.polydiv;
+package polydiv.src;
 
-import java.polydiv.structures.*;
+import polydiv.src.structures.*;
 
 class AdditiveInteger implements AlbelianGroup<Integer> {
 	@Override
@@ -32,9 +32,13 @@ class MultiplicativeInteger implements Monoid<Integer> {
 }
 
 public class Integer extends NearRing<Integer, AdditiveInteger, MultiplicativeInteger> {
+	private static final AdditiveInteger additive = new AdditiveInteger();
+	private static final MultiplicativeInteger multiplicative = new MultiplicativeInteger();
+
 	protected int num;
 
 	public Integer(int num) {
+		super(additive, multiplicative);
 		this.num = num;
 	}
 
@@ -51,4 +55,8 @@ public class Integer extends NearRing<Integer, AdditiveInteger, MultiplicativeIn
 		this.num = num;
 	}
 
+	@Override
+	public String toString() {
+		return getNum() + "";
+	}
 }

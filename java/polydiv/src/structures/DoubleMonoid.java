@@ -1,7 +1,11 @@
-package java.polydiv.structures;
+package polydiv.src.structures;
 
 public abstract class DoubleMonoid<T extends DoubleMonoid<T, A, M>, A extends Monoid<T>, M extends Monoid<T>>
 		extends DoubleMagma<T, A, M> {
+
+	protected DoubleMonoid(A additive, M multiplicative) {
+		super(additive, multiplicative);
+	}
 
 	/**
 	 * Get the zero element. Must be the same as the multiplicative identity, i.e.
