@@ -1,4 +1,4 @@
-package polydiv.src;
+package polydiv.src.types;
 
 import polydiv.src.structures.*;
 
